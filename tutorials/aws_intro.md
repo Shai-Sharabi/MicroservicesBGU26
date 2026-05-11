@@ -10,27 +10,13 @@ AWS operates state-of-the-art, highly available data centers. Although rare, fai
 
 Each **Region** is designed to be isolated from the other Regions. This achieves the greatest possible **fault tolerance** and **stability**.
 
-Here are a few available regions of AWS:
 
-| Code           | Name                    |
-|----------------|-------------------------|
-| `us-east-2`    | US East (Ohio)          |
-| `us-east-1`    | US East (N. Virginia)   |
-| `us-west-1`    | US West (N. California) |
-| `us-west-2`    | US West (Oregon)        |
-| `eu-west-1`    | 	Europe (Ireland)       |
-| `eu-central-1` | 	Europe (Frankfurt)     |
-| `eu-north-1`   | 	Europe (Stockholm)     |
+In this course we will use the `us-east-1` (N. Virginia) region *only*.
 
-Each Region has multiple, isolated locations known as **Availability Zones**. The code for Availability Zone is its Region code followed by a letter identifier. For example, `us-east-1a`.
+The `us-east-1` region (and all other regions) has multiple, isolated locations known as **Availability Zones**. The code for Availability Zone is its Region code followed by a letter identifier. For example, `us-east-1a`, `us-east-1b`, `us-east-1c`, etc.
 
-## SLA
+*In the AWS web console, please make sure you are operating in the `us-east-1` region. You can check this in the top right corner of the console, next to your account name.*
 
-AWS Service Level Agreements (**SLA**) are commitments made by AWS to its customers regarding the availability and performance of its cloud services.
-SLAs specify the percentage of uptime that customers can expect from AWS services and the compensation they can receive if AWS fails to meet these commitments.
-AWS offers different SLAs for different services, and the SLAs can vary based on the region and the type of service used. AWS SLAs provide customers with a level of assurance and confidence in the reliability and availability of the cloud services they use.
-
-For more information, [here](https://aws.amazon.com/legal/service-level-agreements/?aws-sla-cards.sort-by=item.additionalFields.serviceNameLower&aws-sla-cards.sort-order=asc&awsf.tech-category-filter=*all).
 
 ## Launch a virtual machine (EC2 instance) 
 
@@ -69,7 +55,8 @@ It allows users to create and manage virtual machines, commonly referred to as "
       **Important**  
       This is the only chance for you to save the private key file\.
 
-   6. Your private key file has to have permission of `400`, `chmod` it if needed.
+> [!NOTE]
+> If you are working on a university lab computer, make sure to store your files on your personal **S:/** drive or on `\\spaceware.bgu.ac.il\` - files saved locally on lab computers may be deleted between sessions.
 
 7. Next to **Network settings**, choose **Edit**\. 
 
@@ -104,13 +91,82 @@ ssh -i "</path/key-pair-name.pem>" ubuntu@<instance-public-dns-name-or-ip>
 
 # Exercises
 
-## :pencil2: EC2 instance security group 
+## :pencil2: EC2 instance security group
 
-Try to `ping` the instance from your local machine. Having troubles?
-Note that by default, the only allowed inbound traffic to an EC2 instance is port 22 (why?).
-[Take a look here](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/authorizing-access-to-an-instance.html#add-rule-authorize-access) to know how to allow inbound traffic for different ports. 
+AWS uses **Security Groups** as virtual firewalls that control inbound and outbound traffic to your EC2 instances.
+By default, a new security group allows **only port 22 (SSH)** for inbound traffic - everything else is blocked.
 
+> Why do you think only port 22 is open by default?
+
+To allow other types of traffic, you need to add inbound rules to the security group.
+Here's how:
+
+1. In the EC2 console, select your instance and open the **Security** tab.
+2. Under **Security groups**, click on your security group's link.
+3. Click **Edit inbound rules**.
+4. Click **Add rule** and configure:
+   - **Type**: select from the dropdown (e.g. `All ICMP - IPv4` for ping, or `Custom TCP` for a specific port)
+   - **Source**: `0.0.0.0/0` (all IP addresses)
+5. Click **Save rules**.
+
+Now try it: try to `ping` your instance from your local machine:
+
+```bash
+ping <instance-public-ip>
+```
 
 
 ## :pencil2: Deploy YoloAPI on an EC2 instance
 
+[YoloService](https://github.com/alonitac/YoloService.git) is a FastAPI-based web service that performs object detection on uploaded images using the YOLOv8 model.
+
+**On your EC2 instance**, set up and run the service:
+
+1. Install required system packages:
+   ```bash
+   sudo apt update
+   sudo apt install python3.14-venv python3-pip libgl1
+   ```
+
+2. Create and activate a Python virtual environment:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+3. Clone the repository and install dependencies:
+   ```bash
+   git clone https://github.com/alonitac/YoloService.git
+   cd YoloService
+   pip install -r torch-requirements.txt
+   pip install -r requirements.txt
+   ```
+
+4. Run the application:
+   ```bash
+   python app.py
+   ```
+   The service listens on port `8080`.
+
+5. **Open port 8080 in your security group** so the service is reachable from the internet. You've done this before - add the appropriate inbound rule to your instance's security group.
+
+**On your local machine**, download the test image (the famous Beatles image):
+
+```bash
+curl -L -o beatles.jpeg "https://github.com/alonitac/YoloService/raw/main/beatles.jpeg"
+```
+
+
+Then, send a `POST` request to the service to perform object detection:
+
+```bash
+curl -X POST -F "file=@beatles.jpeg" http://<your-instance-public-ip>:8080/predict
+```
+
+The response will include a `uid`. Use it to retrieve the detection results:
+
+```bash
+curl -X GET http://<your-instance-public-ip>:8080/prediction/<uid>
+```
+
+Well done!
