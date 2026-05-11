@@ -43,11 +43,11 @@ Read the instructions **carefully** and follow them step by step.
 
 <tr>
  <td>2</td>
- <td>Intro</td>
- <td><a href="tutorials/docker_containers.md">Intro to containers</a></td>
+ <td>Containers</td>
+ <td><a href="tutorials/docker_yoloservice.md">Intro to containers</a></td>
  <td><a target="_blank" href="https://alonitac.github.io/Microservices23/slides/containers_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/slides.png" /></a></td>
- <td><a target="_blank" href="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/multichoice-questions/aws_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/qm.png" /></a></td>
- <td><a href="tutorials/docker_containers.md#exercises"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/pen.png" /></a></td>
+ <td></td>
+ <td><a href="tutorials/docker_yoloservice.md#exercises"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/pen.png" /></a></td>
  <td></td>
 </tr>			
 
