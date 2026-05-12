@@ -259,5 +259,5 @@ Get the Prometheus container IP (again, from `docker inspect`) and use it to con
 
 Go to the **Explore** panel and try querying a metric from the YoloService. Can you build a graph showing the number of predictions over time? 
 
-*Bonus*: Import Dashboard ID `16110` from the Grafana community to visualize YoloService metrics.
+*Bonus*: Import Dashboard ID `18739` from the Grafana community to visualize YoloService metrics.
 
