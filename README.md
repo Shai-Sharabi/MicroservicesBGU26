@@ -35,8 +35,8 @@ Read the instructions **carefully** and follow them step by step.
  <td>1</td>
  <td>Intro</td>
  <td>Intro to cloud computing</td>
- <td><a target="_blank" href="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/slides/aws_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/slides.png" /></a></td>
- <td><a target="_blank" href="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/multichoice-questions/aws_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/qm.png" /></a></td>
+ <td><a target="_blank" href="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/slides/bgu_aws_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/slides.png" /></a></td>
+ <td><a target="_blank" href="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/multichoice-questions/bgu_aws_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/qm.png" /></a></td>
  <td></td>
  <td></td>
 </tr>			
@@ -45,7 +45,7 @@ Read the instructions **carefully** and follow them step by step.
  <td>2</td>
  <td>Containers</td>
  <td><a href="tutorials/docker_yoloservice.md">Docker containers</a></td>
- <td><a target="_blank" href="https://alonitac.github.io/Microservices23/slides/containers_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/slides.png" /></a></td>
+ <td><a target="_blank" href="https://alonitac.github.io/Microservices23/slides/bgu_docker_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/slides.png" /></a></td>
  <td></td>
  <td><a href="tutorials/docker_yoloservice.md#exercises"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/pen.png" /></a></td>
  <td></td>
