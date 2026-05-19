@@ -109,28 +109,37 @@ Volumes can be shared among multiple containers.
 
 Unlike a bind mount, you can create and manage volumes outside the scope of any container.
 
-```bash 
-docker volume create my-vol
+Grafana stores its dashboards, data sources, and settings in `/var/lib/grafana` inside the container. To persist this data, we can create a volume and mount it to that path:
+
+```bash
+ 
+docker volume create grafana-storage
+
+docker run -d \
+  -p 3000:3000 \
+  -v grafana-storage:/var/lib/grafana \
+  --name grafana \
+  grafana/grafana
 ```
 
 Let's inspect the created volume:
 
 ```bash
-$ docker volume inspect my-vol
+$ docker volume inspect grafana-storage
 [
     {
         "CreatedAt": "2023-05-10T14:28:15+03:00",
         "Driver": "local",
         "Labels": {},
-        "Mountpoint": "/var/lib/docker/volumes/my-vol/_data",
-        "Name": "my-vol",
+        "Mountpoint": "/var/lib/docker/volumes/grafana-storage/_data",
+        "Name": "grafana-storage",
         "Options": {},
         "Scope": "local"
     }
 ]
 ```
 
-Inspecting the volume discovers the real location that the data will be stored on the host machine: `/var/lib/docker/volumes/my-vol/_data`.
+Inspecting the volume discovers the real location that the data will be stored on the host machine: `/var/lib/docker/volumes/grafana-storage/_data`.
 
 The `local` volume driver is the default built-in driver that stores data on the local host machine.
 But docker offers [many more](https://docs.docker.com/engine/extend/legacy_plugins/#volume-plugins) drivers that allow you to create different types of volumes that can be mapped to your container.
@@ -138,138 +147,70 @@ For example, the [Azure File Storage plugin](https://github.com/Azure/azurefile-
 
 # Exercises
 
+### :pencil2: Yolo service stack
+
+```
+┌─────────────────────────────┐     ┌──────────────────────────────┐
+│        yolo-net             │     │        monitoring-net        │
+│                             │     │                              │
+│  yolo-frontend ──► yolo     │     │  prometheus ──► grafana      │
+│                   service   │◄────│  (prometheus also joins      │
+└─────────────────────────────┘     │   yolo-net to scrape metrics)│
+                                    └──────────────────────────────┘
+```
+
+Your goal is to bring up the full stack shown above. You've already worked with the `yolo-service`, `grafana`, and `prometheus` containers in previous exercises. Now you need to connect them together using Docker's `bridge` network driver, and add the `yolo-frontend` container to the stack as well.
+
+The `yolo-frontend` service is a simple web UI that lets users upload images to the YoloService and view detection results.
+
+Clone it into your EC2 home directory and build the image:
+
+```bash
+cd ~
+git clone https://github.com/alonitac/YoloFrontend.git
+cd YoloFrontend
+```
+
+**Networking requirements**
+
+- Create two custom bridge networks: `yolo-net` and `monitoring-net`.
+- `yolo-frontend` and `yolo-service` should both be attached to `yolo-net`. The frontend should reach the backend using the `yolo-service` hostname.
+- `prometheus` and `grafana` should both be attached to `monitoring-net`.
+- `prometheus` should also be attached to `yolo-net` so it can scrape metrics from `yolo-service`.
+
+
 ### :pencil2: Persist Grafana and Prometheus using Volumes 
 
-... 
+**Grafana** stores all of its state - dashboards, data source configurations, users, and settings - inside the container at `/var/lib/grafana`. Without persistence, any dashboard you create or data source you configure will be lost the moment the container is removed.
 
 
-### :pencil2: Docker networks and volumes
+**Prometheus** has two distinct paths worth thinking about:
 
+- `/prometheus` - the database path where Prometheus writes all scraped metrics. This is runtime data that grows over time, and we want it to survive container restarts. A **named volume** is the right choice here.
+- `/etc/prometheus/prometheus.yml` - the configuration file that tells Prometheus which targets to scrape, what intervals to use, and how to label metrics. This is a file *you* author and maintain on the host. Since you need to edit it directly and have it reflected in the container immediately, a **bind mount** is more appropriate than a volume - it maps your local config file directly into the container rather than copying it into Docker-managed storage.
 
-The [default bridge network](https://docs.docker.com/network/network-tutorial-standalone/#use-the-default-bridge-network) official tutorial demonstrates how to use the default bridge network that Docker sets up for you automatically. 
+For each of the above, run the relevant containers with the appropriate `-v` flags to apply the persistence strategy described. Verify your persistence works by stopping and removing a container, starting a fresh one with the same mounts, and confirming the data is still there.
 
-The [user-defined bridge networks](https://docs.docker.com/network/network-tutorial-standalone/#use-user-defined-bridge-networks) official tutorial shows how to create and use your own custom bridge networks, to connect containers running on the same host machine.
-
-
-
-
-### :pencil2: Mount the Nginx conf file 
-
-1. Run your NetflixMovieCatalog container.
-2. Create an Nginx container which routes the traffic to your NetflixMovieCatalog container. 
-   For simplicity, you don't need to wrap the Flask app with uWSGI. Instead, your Nginx communicates directly with Flask using a simple `proxy_pass` directive over HTTP protocol:
-   ```text
-   server {
-     listen 80;
-     server_name  localhost;
-     location / {
-       proxy_pass http://<netflix_movie_catalog>:8080;
-      }
-   } 
-   ```
-   
-   While `<netflix_movie_catalog>` is the container IP of your NetflixMovieCatalog container.
-3. Persist the `.conf` file of Nginx so you can kill the container and start a fresh one, and still the Nginx custom server configuration would be applied. 
-4. Visit the app via Nginx. 
-
-### :pencil2: Persist InfluxDB database
-
-Your goal is to run InfluxDB container from the [previous exercise](docker_containers.md#pencil2-availability-test-system) while the data is stored persistently.
-
-Make sure the data is persistent by `docker kill` the container and create a new container one.  
 
 ### :pencil2: Understanding user file ownership in docker
 
-When running a container, the default user inside the container is often set to the `root` user, and this user has full control of the container's processes.
-Since containers are isolated process in general, we don't really care that `root` is the user operating within the container.
+Many popular images - including `nginx` - run their main process as `root` inside the container by default.
+Inside an isolated container this is usually acceptable, but it becomes a real concern the moment you bind-mount a directory from the host: files written by the container's `root` process appear on the host machine as owned by `root` (UID 0), even if *you* are a regular unprivileged user on that host.
 
-But, when mounting directories from the host machine using the `-v` command, it is important to be cautious when using the root user in a container. Why?
+We will investigate this case in this exercise.
 
-We will investigate this case in this exercise...
-
-1. On your host machine, create a directory under `~/test_docker`.
-2. Run the `ubuntu` container while mounting `/test` within the container, into `~/test_docker` in the host machine:
-
-```bash
-docker run -it -v ~/test_docker:/test ubuntu /bin/bash
-```
-
-3. From your host machine, create a file within `~/test_docker` directory.
-4. From the `ubuntu` container, list the mounted directory (`/test`), can you see the file you've created from your host machine?
-   Who are the UID (user ID) and GID (group ID) owning the file?
-5. From within the container, create a file within `/test`.
-6. List `~/test_docker` from your host machine. Who are user and group owning the file created from the container?
-7. Try to indicate the potential vulnerability: "If an attacker gains control of the container, they may be able to..."
-8. Repeat the above scenario, but instead of using `-v`, use docker volumes. Starts by creating a new volume by: `docker create volume testvol`. Describe how using docker managed volume can reduce the potential risk.
+1. On your host machine, create a directory `mkdir ~/nginx_logs`.
+2. Run an `nginx` container with a bind mount that maps `~/nginx_logs` on the host to `/var/log/nginx` inside the container (where nginx writes its access and error logs). Run it in detached mode and expose port 80 outside the container (e.g. `8080:80`).
+3. Send a few HTTP requests to the nginx server (`curl localhost:8080`) so that nginx actually writes to its log files.
+4. On your host machine, inspect `~/nginx_logs` path by `ls -l`. Who owns the files that nginx created?
+   What UID and GID do they have? Why?
+5. Try to delete or overwrite one of those log files from your host machine as your regular user. What happens?
 
 
-### :pencil2: Investigate volume mounting
+**Rootless containers**
 
-Use the `ubuntu` container to experiment with volume mounting and answer the following questions:
-
-1. What happens when you mount an **empty docker volume** into a directory in the container in which files or directories exist?
-2. What happens when you start a container and specify a docker volume name that does not exist?
-3. What happens when you mount a path using **bind mount** of non-empty directory in the container?
-4. What happens when you start a container and specify paths (both in the host machine and the container) that does not exist?
-
-[docker_volumes]: https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/docker_volumes.png
-
-
-# Exercises
-
-### :pencil2: The Packet's Journey: Container → Internet
-
-
-
-### :pencil2: Inspecting container networking
-
-Run the `busybox` image by:
-
-```bash
-docker run -it busybox /bin/sh
-```
-
-1. On which network this container is running?
-2. What is the name of the network interface that the container is connected to, as it is seen from the host machine?
-3. What is the name of the network interface that the container is connected to as it is seen from within the container?
-4. What is the IP address of the container?
-5. Using the `route` command, what is the default gateway ip that the container use to access the internet?
-6. Provide an evidence that the container's default gateway IP is the IP address of the default bridge network on the host machine the container is running on.
-7. What are the IP address(es) of the DNS server the container used to resolve hostnames? Provide an evidence that they are identical to the DNS servers host machine.
-8. Create a new bridge network, connect your running container to this network.
-9. Provide an evidence that the container has been connected successfully to the created network.
-10. From the host machine, try to `ping` the container using both its IP addresses.
-11. After you've connected the container to a custom bridge network, what are the IP address of the DNS server the container used to resolve hostnames? What does it mean?
-
-
-### :pencil2: The Host network driver 
-
-The Host network driver is a network mode in Docker where a container shares the network stack of the host machine.
-When a container is run with the Host network driver, it bypasses Docker's virtual networking infrastructure and directly uses the network interfaces of the host.
-This allows the container to have unrestricted access to the host's network interfaces, including all network ports. However, it also means that the container's network stack is not isolated from the host, which can introduce security risks.
-
-Complete Docker's short tutorial that demonstrates the use of the host network driver:      
-https://docs.docker.com/network/network-tutorial-host/
-
-
-
-### :pencil2: Flask, Nginx, MongoDB
-
-Your goal is to build the following architecture:
-
-![](../.img/docker_nginx-flask-mongo.png)
-
-- The Dockerfiles of the nginx and the flask apps can be found in our shared repo under `nginx_flask_mongodb`.
-- The mongo app should be run using the pre-built [official Mongo image](https://hub.docker.com/_/mongo).
-- The nginx and flask app should be connected to a custom bridge network called `public-net-1` network.
-- In addition, the flask app the mongo should be connected to a custom bridge network called `private-net-1` network.
-- The nginx should talk with flask using the `flask-app` hostname.
-- The flask app should talk to the mongo using the `mongo` hostname.
-
-### :pencil2: Overlay network using Calico
-
-
-
+One modern mitigation for this class of problem is running Docker itself in [**rootless mode**](https://docs.docker.com/engine/security/rootless/).
+In rootless mode, the Docker daemon and all containers run entirely within the user's own namespace - the `root` user *inside* the container is mapped to your unprivileged host UID, not to the real system root. This means files created by a container via a bind mount are owned by you on the host, not by root, significantly reducing the blast radius if a container is compromised.
 
 
 
