@@ -59,29 +59,22 @@ The final network architecture looks like the following - you will create two cu
 
 #### Notes
 
-- Source code for the YoloService is https://github.com/alonitac/YoloService. **Important** - You should fetch new changes from the repo (run `git pull` from the `YoloService` directory) and rebuild the image to get the YoloFrontend talks with YoloService.
-- Source code for the YoloFrontend can be found at https://github.com/alonitac/YoloFrontend. You should clone the repository into your virtual machine: 
+- Source code for the YoloService is https://github.com/alonitac/YoloService. **Important** - You should fetch new changes from the repo (run `git pull` from the `YoloService` directory) and rebuild the image to get the YoloFrontend talking with YoloService.
+- You've already cloned and built the `yolo-frontend` image in the previous exercise - reuse it here.
+- Both grafana and prometheus should persist data, as done in the previous exercise.
+
+Start the stack by:
 
 ```bash
-cd ~
-git clone https://github.com/alonitac/YoloFrontend
-```
-
-Then, create a `Dockerfile` for it (get help from ChatGPT if you need). Then build and push the image to DockerHub, just like you did for YoloService image.
-
-- Grafana should persist data in `/var/lib/grafana`, so you should mount a volume for it. - Prometheus should also persist data in `/prometheus` and read its config from `./prometheus.yml`, so you should mount two volumes for it.
-
-
-
-At the end, you should open `http://<your-ec2-ip>:3000` in your browser and send an image through the YoloFrontend UI.
-
-In addition, you should be able to restart the stack and confirm data survives:
-
-```bash
-docker compose down        # stops and removes containers, but NOT volumes
 docker compose up -d
 ```
 
-Then open Grafana - your data source configuration should still be there.
+Now you should open `http://<your-ec2-ip>:3000` in your browser and send an image through the YoloFrontend UI.
+
+to stop the stack, run:
+
+```bash
+docker compose down        # stops and removes containers, but NOT volumes
+```
 
 
