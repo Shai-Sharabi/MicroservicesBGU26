@@ -35,7 +35,6 @@ Push to main branch
 
 This guarantees that exactly the code you pushed is what runs in production, and old images are never silently overwritten.
 
----
 
 ## Workflow file
 
@@ -54,7 +53,7 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -70,7 +69,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # Build and push the image
-      #   The image is tagged with the short Git commit SHA so every build
+      #   The image is tagged with the Git commit SHA so every build
       #   produces a unique, traceable tag (e.g. abc1234).
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -79,6 +78,11 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/yolo-service:${{ github.sha }}
 
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
       # SSH into EC2 and deploy
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1
@@ -94,7 +98,6 @@ jobs:
             docker compose up -d
 ```
 
----
 
 ## The `docker-compose.yml` on the EC2 instance
 
@@ -156,8 +159,6 @@ The `.pem` file is a plain text file. You need to copy its **entire contents** -
 > **Tip**: Make sure there are no extra blank lines or spaces at the beginning or end of the pasted value. The key must start with `-----BEGIN` on the very first line.
 
 
----
-
 ## Triggering and monitoring the pipeline
 
 1. Make any change to your code (e.g. add a comment to `app.py`), commit and push to `main`.
@@ -187,7 +188,6 @@ You cannot add secrets or push workflows to a repo you do not own, so you need y
 
 All the exercises below are done in **your fork**, not the original repository.
 
----
 
 ### :pencil2: Create a CI/CD pipeline for YoloService
 
