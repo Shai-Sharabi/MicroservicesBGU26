@@ -16,11 +16,17 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
 
   grafana:
     image: grafana/grafana
     ports:
       - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+volumes:
+  grafana-data:
+  prometheus-data:
 ```
 
 The given Docker Compose file describes a multi-service application with two services: `prometheus` and `grafana`. 
@@ -61,6 +67,7 @@ The final network architecture looks like the following - you will create two cu
 
 - Source code for the YoloService is https://github.com/alonitac/YoloService. **Important** - You should fetch new changes from the repo (run `git pull` from the `YoloService` directory) and rebuild the image to get the YoloFrontend talking with YoloService.
 - You've already cloned and built the `yolo-frontend` image in the previous exercise - reuse it here.
+- `yolo-frontend` and `yolo-service` should both be attached to `yolo-net`. The frontend container should reach the backend using the `yolo-service` hostname by setting the `YOLO_API_URL` environment variable to `http://yolo-service:8080`.
 - Both grafana and prometheus should persist data, as done in the previous exercise.
 
 Start the stack by:

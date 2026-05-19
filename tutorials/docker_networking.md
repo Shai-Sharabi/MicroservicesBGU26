@@ -174,9 +174,10 @@ cd YoloFrontend
 **Networking requirements**
 
 - Create two custom bridge networks: `yolo-net` and `monitoring-net`.
-- `yolo-frontend` and `yolo-service` should both be attached to `yolo-net`. The frontend should reach the backend using the `yolo-service` hostname.
+- `yolo-frontend` and `yolo-service` should both be attached to `yolo-net`. The frontend container should reach the backend using the `yolo-service` hostname by setting the `YOLO_API_URL` environment variable to `http://yolo-service:8080`.
 - `prometheus` and `grafana` should both be attached to `monitoring-net`.
 - `prometheus` should also be attached to `yolo-net` so it can scrape metrics from `yolo-service`.
+
 
 
 ### :pencil2: Persist Grafana and Prometheus using Volumes 
