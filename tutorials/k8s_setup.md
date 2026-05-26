@@ -1,5 +1,16 @@
 # Intro to Kubernetes 
 
+
+
+TODO
+
+- comment on prepared role 
+- add details to launch the ubuntu instance with configuring the role, and security group (prepare one). 
+- test that 2 clusters can be up and running in parallel
+- test online boutique works. 
+
+
+
 In this section you'll provision a Kubernetes cluster consists by **one control plane node** and **one worker node**.
 Although AWS offers EKS, a managed service that simplifies cluster setup and management, we will manually set up the cluster using `kubeadm`.
 This hands-on approach will allow you to gain a deeper understanding of Kubernetes architecture and the processes involved in cluster creation and configuration. 
@@ -42,51 +53,80 @@ Node components run on every node, maintaining running pods and providing the Ku
 use this role (created by me + explain the role) - `kubeadm-cluster-node-role`. 
 
 2. Launch two `t2` or `t3.medium` Ubuntu instances with `30GB` disk, naming them `<your-name>-control-plane` and `<your-name>-worker`.
-3. Execute the below script **in both machines**. 
+3. SSH into each instance and execute the below script **in both machines** as root. 
+
+First switch to rooll user by 
 
 ```bash
-# These instructions are for Kubernetes v1.32.
-KUBERNETES_VERSION=v1.32
+sudo su -
+```
 
-sudo apt-get update
-sudo apt-get install jq unzip ebtables ethtool -y
+Then
 
-# install awscli
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+```bash
+set -euo pipefail
+
+kubernetes_version=v1.35
+
+# Log all output
+exec > >(tee /var/log/user-data.log)
+exec 2>&1
+
+# Update system
+apt-get update
+apt-get install jq unzip ebtables ethtool -y
+
+# Install AWS CLI
+echo "Installing AWS CLI..."
+curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
-sudo ./aws/install
+./aws/install
+rm -rf awscliv2.zip aws/
+
 
 # Enable IPv4 packet forwarding. sysctl params required by setup, params persist across reboots
-cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+echo "Configuring kernel parameters..."
+cat <<EOF | tee /etc/sysctl.d/k8s.conf
 net.ipv4.ip_forward = 1
 EOF
 
 # Apply sysctl params without reboot
-sudo sysctl --system
+sysctl --system
 
 # Install cri-o kubelet kubeadm kubectl
-curl -fsSL https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+echo "Installing Kubernetes ${kubernetes_version} components..."
+curl -fsSL https://pkgs.k8s.io/core:/stable:/${kubernetes_version}/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${kubernetes_version}/deb/ /" | tee /etc/apt/sources.list.d/kubernetes.list
 
-curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/ /" | sudo tee /etc/apt/sources.list.d/cri-o.list
+curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/ /" | tee /etc/apt/sources.list.d/cri-o.list
 
-sudo apt-get update
-sudo apt-get install -y software-properties-common apt-transport-https ca-certificates curl gpg
-sudo apt-get install -y cri-o kubelet kubeadm kubectl
-sudo apt-mark hold kubelet kubeadm kubectl
+apt-get update
+apt-get install -y software-properties-common apt-transport-https ca-certificates curl gpg
+apt-get install -y cri-o kubelet kubeadm kubectl amazon-ecr-credential-helper
+apt-mark hold kubelet kubeadm kubectl amazon-ecr-credential-helper
 
-# start the CRIO container runtime and kubelet
-sudo systemctl start crio.service
-sudo systemctl enable --now crio.service
-sudo systemctl enable --now kubelet
+# Start the CRIO container runtime and kubelet
+echo "Starting container runtime and kubelet..."
+systemctl start crio.service
+systemctl enable --now crio.service
+systemctl enable --now kubelet
 
-# disable swap memory
+# Disable swap memory
+echo "Disabling swap..."
 swapoff -a
 
-# add the command to crontab to make it persistent across reboots
-(crontab -l ; echo "@reboot /sbin/swapoff -a") | crontab -
+# Add the command to crontab to make it persistent across reboots
+(crontab -l 2>/dev/null; echo "@reboot /sbin/swapoff -a") | crontab -
+
+# Create a marker file to indicate setup completion
+echo "Setup completed at $(date)" | tee /var/log/k8s-setup-complete
 ```
+
+> [!TIP]
+> Create AMI fo further instances, or use prepared AMI: ...
+
+
 
 The script essentially installs: 
 
@@ -131,6 +171,13 @@ sudo kubeadm init
    Make sure you understand the [role of each component in the architecture](https://kubernetes.io/docs/concepts/architecture/).
 
 
+3. Set `kubectl`: 
+
+```bash
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+```
 
 > [!NOTE]
 > - To run `kubeadm init` again, you must first [tear down the cluster](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#tear-down).
@@ -158,7 +205,7 @@ There are many [addons that implement the CNI](https://kubernetes.io/docs/concep
 We'll install [Calico](https://docs.tigera.io/calico/latest/about/), simply by:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/calico.yaml
+kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.2/manifests/calico.yaml
 ```
 
 Make sure you have nodes are ready:
