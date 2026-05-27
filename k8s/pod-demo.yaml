@@ -8,6 +8,6 @@ metadata:
 spec:
   containers:
   - name: server
-    image: alonithuji/yolo-service:0.0.2
+    image: docker.io/alonithuji/yolo-service:0.0.2
     ports:
     - containerPort: 8080

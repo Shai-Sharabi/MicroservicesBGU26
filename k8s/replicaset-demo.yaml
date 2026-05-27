@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
       - name: server
-        image: alonithuji/yolo-service:0.0.1
+        image: docker.io/alonithuji/yolo-service:0.0.1
         ports:
         - containerPort: 8080
