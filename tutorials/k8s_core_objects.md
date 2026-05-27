@@ -34,7 +34,7 @@ metadata:
 spec:
   containers:
   - name: server
-    image: alonithuji/yolo-service:0.0.1
+    image: docker.io/alonithuji/yolo-service:0.0.1
     ports:
     - containerPort: 8080
 ```
@@ -179,7 +179,7 @@ spec:
     spec:
       containers:
       - name: server
-        image: alonithuji/yolo-service:0.0.1
+        image: docker.io/alonithuji/yolo-service:0.0.1
         ports:
         - containerPort: 8080
 ```
@@ -253,7 +253,7 @@ spec:
     spec:
       containers:
       - name: server
-        image: alonithuji/yolo-service:0.0.1
+        image: docker.io/alonithuji/yolo-service:0.0.1
         ports:
         - containerPort: 8080
 ```
@@ -426,7 +426,7 @@ The `kube-proxy` (running in every node) ensures that connections to the service
 Let's use the `kubectl run` command to create a **temporary** pod name `busybox-client` (based on the useful [`busybox` docker image](https://hub.docker.com/_/busybox)) that will communicate with our YoloService: 
 
 ```bash
-kubectl run busybox-client --rm --image=busybox --restart=Never -- sh -c 'while true; do wget -qO- http://yolo-svc:8080; sleep 5; done'
+kubectl run busybox-client --rm --image=docker.io/busybox --restart=Never -- sh -c 'while true; do wget -qO- http://yolo-svc:8080; sleep 5; done'
 ```
 
 ### Service DNS 
@@ -499,7 +499,7 @@ spec:
     spec:
       containers:
       - name: prometheus
-        image: prom/prometheus
+        image: docker.io/prom/prometheus
         ports:
         - containerPort: 9090
         volumeMounts:
@@ -533,7 +533,7 @@ ConfigMaps can also be consumed as **environment variables**, similarly to how y
 Deploy the YoloService object-detection API you already know from the Docker tutorials - this time on Kubernetes.
 
 1. Create a `Deployment` named `yolo-service` based on the [`alonithuji/yolo-service:0.0.2`](https://hub.docker.com/r/alonithuji/yolo-service) image. The container listens on port `8080`. Run **2 replicas**.
-2. Expose it with a `Service` named `yolo-svc` on port `8080`.
+2. Expose it (internally to the cluster) with a `Service` named `yolo-svc` on port `8080`.
 3. Verify the pods are running and the service has endpoints:
    ```bash
    kubectl get pods -l app=yolo-service
@@ -573,11 +573,7 @@ In this exercise you deploy [Prometheus](https://prometheus.io/) and [Grafana](h
 1. Create a `ConfigMap` named `prometheus-config` that holds the `prometheus.yml` scrape configuration targeting `yolo-svc:8080` (as shown in the ConfigMap tutorial section above).
 2. Create a `Deployment` named `prometheus` based on the [`prom/prometheus`](https://hub.docker.com/r/prom/prometheus) image, with the ConfigMap mounted at `/etc/prometheus/`. The container listens on port `9090`.
 3. Expose it with a `Service` named `prometheus-svc` on port `9090`.
-4. Forward the service and verify Prometheus is scraping the YoloService:
-   ```bash
-   kubectl port-forward service/prometheus-svc 9090:9090 --address 0.0.0.0
-   ```
-   Open `http://<your-control-plane-ip>:9090` → **Status → Targets** - the `yolo-service` job should be listed as **UP**.
+
 
 #### Grafana
 
@@ -595,5 +591,75 @@ In this exercise you deploy [Prometheus](https://prometheus.io/) and [Grafana](h
    - Set the URL to `http://prometheus-svc:9090`.
    - Click **Save & Test**.
 9. Send a few prediction requests through the YoloFrontend and explore the YoloService metrics in Grafana's **Explore** panel.
+
+
+
+### :pencil2: Expand the cluster
+
+In this exercise you will grow your cluster by adding a second worker node and a second control plane node, simulating a production-grade, highly-available setup.
+
+> [!TIP]
+> To save time, use the prepared AMI `kubeadm-cluster-node-base-img` when launching new instances - it already has `kubeadm`, `kubelet`, `kubectl`, and `cri-o` installed from the setup script above. You only need to launch the instance and run the join command.
+
+#### Add a second worker node
+
+1. Launch a new `t3.medium` Ubuntu instance from the prepared AMI, naming it `<your-name>-worker-2`. Attach the `kubeadm-cluster-node-role` IAM role and the `kubeadm-cluster-node-sg` security group, with a `30 GiB` root volume.
+
+2. On the **control plane node**, generate a fresh join command (valid for 24 hours):
+   ```bash
+   kubeadm token create --print-join-command
+   ```
+
+3. SSH into `worker-2` and run the printed `kubeadm join ...` command as root, adding the `--cri-socket` flag:
+   ```bash
+   sudo <paste the join command here> --cri-socket unix:///var/run/crio/crio.sock
+   ```
+
+4. Back on the control plane, confirm the new node appears and eventually reaches `Ready`:
+   ```bash
+   kubectl get nodes -o wide
+   ```
+
+
+#### Add a second control plane node
+
+A single control plane is a single point of failure - if it goes down, the entire cluster API becomes unreachable.
+Adding a second control plane node makes the cluster highly available.
+
+1. Launch another `t3.medium` Ubuntu instance from the prepared AMI, naming it `<your-name>-control-plane-2`. Attach the same IAM role and security group as above.
+
+2. On the **existing control plane**, upload the certificates so the new control plane node can share them, and generate a join command with the `--control-plane` flag:
+   ```bash
+   sudo kubeadm init phase upload-certs --upload-certs
+   ```
+   This prints a `--certificate-key`. Use it together with the regular join command:
+   ```bash
+   kubeadm token create --print-join-command
+   ```
+
+
+3. SSH into `control-plane-2` and run the combined join command as root: 
+
+ ```bash
+   sudo <join command> --control-plane --certificate-key <certificate-key> --cri-socket unix:///var/run/crio/crio.sock
+   ```
+
+4. Once it completes, set up `kubectl` on the new node as well:
+   ```bash
+   mkdir -p $HOME/.kube
+   sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+   sudo chown $(id -u):$(id -g) $HOME/.kube/config
+   ```
+
+5. From either control plane node, verify all nodes are present:
+   ```bash
+   kubectl get nodes -o wide
+   ```
+   Both control plane nodes should show the `control-plane` role.
+
+6. Stop (do **not** terminate) your original control plane instance from the AWS console. Can you still run `kubectl` commands from `control-plane-2`? What does this tell you about HA control planes?
+
+
+
 
 [k8s_core_objects]:  https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/k8s_core_objects.png

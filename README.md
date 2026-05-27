@@ -102,5 +102,27 @@ Read the instructions **carefully** and follow them step by step.
 </tr>	
 
 
+<tr>
+ <td>7</td>
+ <td>Containers</td>
+ <td><a href="tutorials/k8s_setup.md">Kubernetes setup and intro</a></td>
+ <td></td>
+ <td></td>
+ <td><a href="tutorials/k8s_setup.md#exercises"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/pen.png" /></a></td>
+ <td></td>
+</tr>	
+
+
+<tr>
+ <td>8</td>
+ <td>Containers</td>
+ <td><a href="tutorials/k8s_core_objects.md">Kubernetes core objects</a></td>
+ <td></td>
+ <td></td>
+ <td><a href="tutorials/k8s_core_objects.md#exercises"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/pen.png" /></a></td>
+ <td></td>
+</tr>	
+
+
 
 </table>
