@@ -323,20 +323,6 @@ The YoloService exposes this endpoint - when the server is up and ready it retur
 
 Deploy the above manifest and observe that the `yolo-service` Deployment completes the rolling update only once the new Pod passes its readiness probe.
 
-If you want the readiness probe to fail intentionally (e.g. to simulate a not-ready Pod), you can add logic to your `/health` handler that checks an internal **readiness flag** and returns a non-`200` status when the flag is `False`. For a Python Flask application, this would look like:
-
-```python
-is_ready = True
-
-@app.route('/health')
-def health():
-    if not is_ready:
-        return 'Not ready', 503
-    return 'OK', 200
-```
-
-Once you rebuild the image with this change and update the Deployment to use the new image, the readiness probe will pass and traffic will be routed to the Pod.
-
 
 #### Readiness probes are critical to perform a successful Rolling Update 
 
@@ -347,7 +333,7 @@ By failing the readiness probes, the Pod indicates that it's not ready to receiv
 ## Assign Pods to Nodes
 
 There are some circumstances where you may want to control which Node the Pod is deployed on.
-For example, we probably want to ensure that our `yolo-service` Pods are scheduled on nodes with SSD disk (as the object detection workload benefits from fast local storage). 
+For example, we probably want to ensure that our `yolo-service` Pods are scheduled on nodes that have a GPU, since object detection workloads are computationally intensive and benefit greatly from GPU acceleration.
 
 There are [several ways](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/) to allow the Node selection, [nodeSelector](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector) is the simplest recommended form. 
 You can add the `nodeSelector` field to your Pod specification and specify the desirable target node.
@@ -363,7 +349,7 @@ metadata:
     app: yolo-service
 spec:
   nodeSelector:
-    disk: ssd     # <------ Kubernetes only schedules the Pod onto nodes that have the label you specify.
+    gpu: "true"   # <------ Kubernetes only schedules the Pod onto nodes that have the label you specify.
   replicas: 1
   selector:
     matchLabels:
@@ -396,7 +382,7 @@ spec:
 ```
 
 When apply the above manifest, you'll discover that the Pod cannot be schedule on any of the cluster's nodes. 
-This because the **kube-scheduler** didn't find any Node with the `disk=ssd` label. 
+This because the **kube-scheduler** didn't find any Node with the `gpu=true` label.
 
 Like many other Kubernetes objects, Nodes have **labels**:
 
@@ -406,10 +392,10 @@ john-control-plane   Ready    control-plane   22d   v1.35.0   beta.kubernetes.io
 john-worker          Ready    <none>          22d   v1.35.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=john-worker,kubernetes.io/os=linux
 ```
 
-Let's manually attach the label `disk=ssd` to your cluster's worker node:
+Let's manually attach the label `gpu=true` to your cluster's worker node:
 
 ```console
-$ kubectl label nodes <your-worker-node> disk=ssd
+$ kubectl label nodes <your-worker-node> gpu=true
 node/<your-worker-node> labeled
 ```
 
@@ -453,7 +439,7 @@ spec:
       value: "true"
       effect: "NoSchedule"
   nodeSelector:
-    disk: ssd
+    gpu: "true"
   replicas: 1
   selector:
     matchLabels:
@@ -502,61 +488,36 @@ kubectl taint nodes <your-worker-node> gpu=true:NoSchedule-
 
 # Exercises 
 
-### :pencil2: Readiness and Liveness to the Netflix stack 
+### :pencil2: Readiness and Liveness to the YoloService stack
 
-1. Define a `livenessProbe` and a `readinessProbe` for the Netflix stack services:
+Define a `livenessProbe` and a `readinessProbe` for the following services in your stack:
 
-   - NetflixFrontend
-   - NetflixMovieCatalog
+   - YoloService
+   - YoloFrontend
+   - Prometheus
    - Grafana
-   - InfluxDB
-   - Redis
 
-2. In the **NetflixMovieCatalog** service's source code, define a `SIGTERM` signal handler.
-   The handler should indicate that the server is not ready by setting a **global variable** from `True` to `False`.
-   When the server is not ready, you should fail the readiness probes, so the server will stop receiving traffic after a while.
 
 
 ### :pencil2: Zero downtime during scale
 
-Your goal in this exercise is to achieve zero downtime during scale up/down events of a simple webserver.
+Your goal in this exercise is to achieve zero downtime during **manual** scale up/down events of the **YoloFrontend** service.
 
-The code can be found in `k8s/zero_downtime_node` (a simple Nodejs webserver).
-
-1. Build the image and push it to a dedicated DockerHub or ECR repo.
-2. Deploy the app as a simple `Deployment` (with the corresponding `Service`). 
-3. Generate some incoming traffic (20 requests per second) from a dedicated pod: 
+1. Make sure the YoloFrontend `Deployment` and its `Service` are deployed in your cluster. Make sure the `Deployment` has readiness and liveness probes defined.
+2. Generate some incoming traffic (20 requests per second) from a dedicated pod: 
    ```bash
    kubectl run -i --tty load-generator --rm --image=busybox:1.28 --restart=Never -- /bin/sh -c "while sleep 0.05; do (wget -q -O- http://SERVICE_URL &); done"
    ```
-   Chane `SERVICE_URL` accordingly.    
+   Change `SERVICE_URL` to the YoloFrontend service address.
 
-4. Increase the webserver's Deployment replicas while watching the `load-generator` pod logs. Did you lose requests for a short moment? Why?
-5. Decrease the number of replicas, lost requests again? Why? 
-6. Define a `liveness` and `readiness` probes in your Deployment. Change the server code in the `/ready` endpoint, and the `SIGTERM` handler to support zero down-time during scale up/down. You may also want to specify the `terminationGracePeriodSeconds` entry for the container.
-8. Create a horizontal pod autoscaler (HPA) for the deployment. Base your HPA on CPU utilization, set the `resources.requests.cpu` and `resources.limits.cpu` entries `300m`. Maximum number of pods to 10.
-7. Generate some load as described in step 3. Let the HPA to increase and decrease the number of pods. Make sure you don't lose even a single requests during **scale up and scale down** events.
+3. Manually scale up the Deployment replicas by: 
 
-**Bonus**: Make sure you are able to perform a rolling update with zero downtime, during traffic load. 
+```bash
+kubectl scale deployment yolo-frontend --replicas=3
+```
 
-### :pencil2: Pod troubleshoot
+Watch the `load-generator` pod logs. Did you lose requests?
 
-In the file `k8s/pod-troubleshoot.yaml`, a PostgreSQL database Deployment is provided with intentionally injected issues for troubleshooting purposes.
+4. Manually scale down the number of replicas. Lost requests? Why?
+5. Remove the `liveness` and `readiness` probes. Repeat steps 2-4. What happened? Why?
 
-Fix the issues while complying with the below requirements: 
-
-- You should be able to communicate with the DB by (the command creates a temporary Pod that lists the existed databases in your Postgresserver ):
-
-  ```bash
-  kubectl run -i --tty --rm postgres-client --image=postgres:11.22-bullseye --restart=Never -- /bin/sh -c "PGPASSWORD=<your-pg-pass> psql -h postgres-service -U postgres -c '\list'"
-  ```
-  
-  While `<your-pg-pass>` is your postgres DB password.
-
-- The DB must be running on a node labeled `disktype=ssd`.
-- The `postgres:11.22-bullseye` container must be scheduled on a node with at least 50 milli-cpu.
-- The `postgres:11.22-bullseye` container must have liveness and readiness probed configured and working properly. 
-
-
-
-[k8s_multicontainer_pod]: https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/k8s_multicontainer_pod.png
