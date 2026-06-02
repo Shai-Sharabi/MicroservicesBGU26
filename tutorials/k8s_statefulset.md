@@ -2,9 +2,9 @@
 
 In this tutorial, we will deploy **Prometheus** as a StatefulSet backed by an AWS EBS persistent volume, so that collected metrics data survives Pod restarts and rescheduling.
 
-## Why Persistent Storage?
+## Persistent Storage
 
-So far, Pods in the cluster were ephemeral — when a Pod restarts, all files written during its lifetime are lost.
+So far, Pods in the cluster were ephemeral - when a Pod restarts, all files written during its lifetime are lost.
 
 For a monitoring tool like Prometheus, this means losing all historical metrics data every time the Pod is rescheduled or updated.
 
@@ -12,8 +12,6 @@ Kubernetes solves this with [Persistent Volumes](https://kubernetes.io/docs/conc
 In our case, the backing storage will be an **AWS EBS (Elastic Block Store)** volume.
 
 ## The AWS EBS CSI Driver
-
-### What is a CSI Driver?
 
 The [Container Storage Interface (CSI)](https://github.com/container-storage-interface/spec) is a standard API between container orchestrators (like Kubernetes) and storage systems (like AWS EBS).
 
@@ -31,7 +29,7 @@ The nodes already carry the `kubeadm-cluster-node-role` IAM role, which grants t
 Install the driver into your cluster:
 
 ```bash
-kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=release-1.32"
+kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=release-1.60"
 ```
 
 Verify the driver pods are running:
@@ -53,6 +51,7 @@ metadata:
   name: ebs-sc
 provisioner: ebs.csi.aws.com
 volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
 parameters:
   type: gp3
 ```
@@ -67,15 +66,15 @@ kubectl apply -f k8s/ebs-storage-class.yaml
 
 Before provisioning storage for Prometheus, let's understand the three key objects involved:
 
-- **PersistentVolume (PV)** — a piece of storage in the cluster, representing a physical disk (such as an AWS EBS volume). Pods cannot use a PV directly.
-- **PersistentVolumeClaim (PVC)** — a *request* for storage. Pods bind to a PVC, which binds to a PV. This indirection **decouples** storage management from Pod specification: Pods can request storage without knowing the underlying infrastructure.
-- **StorageClass (SC)** — describes a "class" of storage and its provisioner. For example, a StorageClass for AWS EBS `gp3` volumes backed by the EBS CSI driver.
+- **PersistentVolume (PV)** - a piece of storage in the cluster, representing a physical disk (such as an AWS EBS volume). Pods cannot use a PV directly.
+- **PersistentVolumeClaim (PVC)** - a *request* for storage. Pods bind to a PVC, which binds to a PV. This indirection **decouples** storage management from Pod specification: Pods can request storage without knowing the underlying infrastructure.
+- **StorageClass (SC)** - describes a "class" of storage and its provisioner. For example, a StorageClass for AWS EBS `gp3` volumes backed by the EBS CSI driver.
 
 ![k8s_statefulset_and_storage_summary][k8s_statefulset_and_storage_summary]
 
 We will use **static provisioning**: manually create an EBS volume, create a PV pointing to it, then create a PVC that claims it.
 
-## Step 1 – Create an EBS Volume in AWS
+## Step 1 - Create an EBS Volume in AWS
 
 First, find the Availability Zone of your worker node:
 
@@ -95,7 +94,7 @@ aws ec2 create-volume \
 
 Note the `VolumeId` from the output (e.g. `vol-0a1b2c3d4e5f67890`). You will need it in the next step.
 
-## Step 2 – Create a PersistentVolume (PV)
+## Step 2 - Create a PersistentVolume (PV)
 
 Create a PV that points to your EBS volume. Replace `<volume-id>` with the actual EBS volume ID:
 
@@ -126,7 +125,7 @@ kubectl get pv
 
 The PV status should be `Available`.
 
-## Step 3 – Create a PersistentVolumeClaim (PVC)
+## Step 3 - Create a PersistentVolumeClaim (PVC)
 
 A PVC claims the PV we just created:
 
@@ -153,7 +152,7 @@ kubectl get pvc
 
 The PVC status should transition to `Bound`, meaning it has been matched to the PV.
 
-## Step 4 – Deploy Prometheus as a StatefulSet
+## Step 4 - Deploy Prometheus as a StatefulSet
 
 Now deploy Prometheus as a **StatefulSet**, referencing the PVC for its data directory `/prometheus`:
 
@@ -219,13 +218,13 @@ kubectl get pods -l app=prometheus -w
 
 After the Pod restarts, all historical metrics data will still be available.
 
-## Why StatefulSet?
+## StatefulSet characteristics
 
 We used a StatefulSet rather than a Deployment because a StatefulSet provides:
 
-1. **Stable, predictable Pod names** — The Pod is always named `prometheus-0`. This matters when referencing a specific Pod in configuration or scripts.
-2. **Stable volume binding** — The StatefulSet ensures `prometheus-0` always remounts its own PVC after a reschedule or restart, never accidentally mounting another Pod's volume.
-3. **Ordered deployment and termination** — Kubernetes starts or stops Pods one at a time in a defined order, which is essential for stateful workloads.
+1. **Stable, predictable Pod names** - The Pod is always named `prometheus-0`. This matters when referencing a specific Pod in configuration or scripts.
+2. **Stable volume binding** - The StatefulSet ensures `prometheus-0` always remounts its own PVC after a reschedule or restart, never accidentally mounting another Pod's volume.
+3. **Ordered deployment and termination** - Kubernetes starts or stops Pods one at a time in a defined order, which is essential for stateful workloads.
 
 ## Volumes and Data Protection
 
@@ -238,8 +237,8 @@ Kubernetes ships with a **Storage Object in Use Protection** feature:
 
 **Reclaim Policy** controls what happens to the underlying EBS volume after the PV is released:
 
-- `Retain` — The EBS volume is kept after the PV is deleted. You are responsible for cleanup. **Use this in production.**
-- `Delete` — The EBS volume is deleted along with the PV.
+- `Retain` - The EBS volume is kept after the PV is deleted. You are responsible for cleanup. **Use this in production.**
+- `Delete` - The EBS volume is deleted along with the PV.
 
 Our `prometheus-pv` uses `Retain`, so deleting the PV will not destroy the EBS volume or its data.
 
@@ -260,31 +259,27 @@ Follow the same steps as for Prometheus:
 
 Verify that your Grafana dashboards and data sources survive a Pod deletion.
 
+### :pencil2: Dynamic volume provisioning
+
+In the previous steps you created the EBS volume manually and referenced it in a PV.
+Kubernetes also supports **dynamic provisioning**: you only create a PVC, and the EBS CSI driver automatically creates both the EBS volume in AWS and the corresponding PV object — no manual `aws ec2 create-volume` needed.
+
+Repeat the Grafana exercise above using dynamic provisioning:
+
+1. Instead of creating an EBS volume and a PV manually, create only a PVC that references the `ebs-sc` StorageClass.
+2. Deploy Grafana as a StatefulSet using the PVC.
+3. Observe that once the Pod is scheduled, the PVC transitions to `Bound` and a PV is automatically created by the EBS CSI driver.
+
+> [!NOTE]
+> Because the `ebs-sc` StorageClass uses `volumeBindingMode: WaitForFirstConsumer`, the PVC stays in `Pending` until a Pod that uses it is scheduled. At that point the EBS volume is created in the same Availability Zone as the node.
+
 ### :pencil2: Increase volume capacity
 
 Assume the Prometheus volume is running low on disk space. This exercise guides you through properly resizing a Kubernetes volume.
 
-Resizing is done by editing the **PersistentVolumeClaim** object. Never delete and recreate PV/PVC objects to increase size — this risks data loss.
+Resizing is done by editing the **PersistentVolumeClaim** object. Never delete and recreate PV/PVC objects to increase size - this risks data loss.
 
-First, ensure the StorageClass has `allowVolumeExpansion: true`:
-
-```bash
-kubectl describe storageclass ebs-sc
-```
-
-To enable it:
-
-```bash
-kubectl edit storageclass ebs-sc
-```
-
-Add:
-
-```yaml
-allowVolumeExpansion: true
-```
-
-Then increase the storage request in the PVC:
+The `ebs-sc` StorageClass already has `allowVolumeExpansion: true`, so you can increase the storage request in the PVC directly:
 
 ```bash
 kubectl edit pvc prometheus-pvc
