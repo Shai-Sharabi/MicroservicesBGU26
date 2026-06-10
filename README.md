@@ -155,7 +155,7 @@ Read the instructions **carefully** and follow them step by step.
 
 <tr>
  <td colspan="7" align="center">
-  <strong>Got losted?</strong> Apply <a href="k8s/yolo-stack.yaml"><code>k8s/yolo-stack.yaml</code></a> to get the full YoloService + YoloFrontend stack to catch up
+  <strong>Got lost?</strong> Apply <a href="k8s/yolo-stack.yaml"><code>k8s/yolo-stack.yaml</code></a> to get the full YoloService + YoloFrontend stack to catch up
  </td>
 </tr>
 
