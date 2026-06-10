@@ -153,6 +153,40 @@ Read the instructions **carefully** and follow them step by step.
  <td></td>
 </tr>	
 
+<tr>
+ <td colspan="7" align="center">
+  📌 <strong>Got losted?</strong> Apply <a href="k8s/yolo-stack.yaml"><code>k8s/yolo-stack.yaml</code></a> to get the full YoloService + YoloFrontend stack to catch up
+ </td>
+</tr>
 
+<tr>
+ <td>12</td>
+ <td>Orchestration</td>
+ <td><a href="tutorials/k8s_networking.md">Kubernetes Ingress</a></td>
+ <td></td>
+ <td></td>
+ <td><a href="tutorials/k8s_networking.md#exercises"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/pen.png" /></a></td>
+ <td></td>
+</tr>
+
+<tr>
+ <td>13</td>
+ <td>Orchestration</td>
+ <td><a href="tutorials/k8s_argocd.md">ArgoCD and GitOps</a></td>
+ <td></td>
+ <td></td>
+ <td><a href="tutorials/k8s_argocd.md#exercises"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/pen.png" /></a></td>
+ <td></td>
+</tr>
+
+<tr>
+ <td>14</td>
+ <td>Orchestration</td>
+ <td><a href="tutorials/k8s_scaling.md">Pod auto scaling</a></td>
+ <td></td>
+ <td></td>
+ <td></td>
+ <td></td>
+</tr>
 
 </table>
